@@ -1,0 +1,3 @@
+JaDE (Javascript Database Engine) is an in-memory Javascript database. It allows objects to be stored and searched,
+including full-text search, with easy to use object-style filters. It was inspired by TaffyDB and TheLadders.com
+full-text Javascript search.
