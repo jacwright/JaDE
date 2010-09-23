@@ -1,8 +1,8 @@
-var JaDE;
+var jade, q;
 
 (function() {
 
-JaDE = function(storageBucket) {
+jade = function(storageBucket) {
 	this._store = [];
 	this._lookup = {};
 	this._bucket = storageBucket;
@@ -20,7 +20,7 @@ JaDE = function(storageBucket) {
 	}
 }
 
-JaDE.prototype = {
+jade.prototype = {
 
 	/**
 	 * Returns an array of records which match the provided filters, or all the records if no filters are specified. The
@@ -30,7 +30,7 @@ JaDE.prototype = {
 	 * @param [records] An optional array of object to search. If not provided will use all records in the database.
 	 */
 	get: function(filters, records) {
-		return this._filter(records || this._store, filters);
+		return filters instanceof jade.query ? this._query(records || this._store, filters) : this._filter(records || this._store, filters);
 	},
 
 	first: function(filters, records) {
@@ -55,7 +55,7 @@ JaDE.prototype = {
 	},
 
 	update: function(updates, filters) {
-		var records = this._filter(this._store, filters);
+		var records = this.get(filters);
 		if (this.onUpdate) {
 			records.forEach(function(obj) {
 				this.onUpdate(updates, obj);
@@ -66,8 +66,8 @@ JaDE.prototype = {
 	},
 
 	remove: function(filters) {
-		var records = this._store, removed = {}, lookup = this._lookup, onRemove = this.onRemove;
-		records = this._filter(records, filters);
+		var removed = {}, lookup = this._lookup, onRemove = this.onRemove;
+		var records = this.get(filters);
 
 		records.forEach(function(obj) {
 			if (onRemove) onRemove(obj);
@@ -218,6 +218,69 @@ JaDE.prototype = {
 		return terms;
 	},
 	
+	_search: function(value) {
+		var terms = this._getTerms(value, true), index = this._index;
+		var hits = {};
+		
+		terms.forEach(function(term) {
+			var regex = new RegExp(RegExp.escape(term)), char = term.charAt(0), terms = index[char];
+			for (var i in terms) {
+				if (!terms.hasOwnProperty(i)) continue;
+				if (regex.test(i)) {
+					var ids = terms[i];
+					for (var id in ids) {
+						if (ids.hasOwnProperty(id)) hits[id] = true;
+					}
+				}
+			}
+		});
+		
+		return hits;
+	},
+	
+	_sort: function(sorts) {
+		sorts = sorts.map(function(sort) {
+			return sort.toFunction();
+		});
+		return function(a, b) {
+			var direction = 0, i = 0, len = sorts.length;
+			while (i < len && direction == 0) {
+				direction = sorts[i++](a, b);
+			}
+		}
+	},
+	
+	_query: function(records, query) {
+		if (!query) return records;
+		var filter, searches = query._searches, sorts = query._sorts, queryStr = query.toString();
+		if (queryStr) {
+			try {
+				eval('filter = function(obj) { try { return ' + queryStr + '; } catch (e) { console.log(e); return false; } }');
+			} catch (e) {
+				throw new Error('A bug was found in JaDE.query\'s eval() code: "(function(obj) { return ' + query + '; })"');
+			}
+			
+			for (var i in searches) {
+				if (searches.hasOwnProperty(i)) {
+					searches[i] = this._search(searches[i]);
+				}
+			}
+			
+			records = records.filter(filter, query);
+		}
+		
+		if (sorts.length) {
+			records.sort(this._sort(sorts));
+		}
+		if (query._offset) {
+			records = records.slice(query._offset);
+		}
+		if (query._limit) {
+			records.lenght = query._limit;
+		}
+		return records;
+	},
+	
 	/**
 	 * Filters the provided set of records with the provided filters. If no filters are given the records are returned.
 	 *
@@ -337,6 +400,262 @@ JaDE.prototype = {
 		return records;
 	}
 };
+
+
+jade.expression = function(term, operator, value, not) {
+	this.term = term;
+	this.operator = operator;
+	this.value = value;
+	this.not = not;
+	this.template = '%not(%term %operator %value)';
+};
+jade.expression.prototype = {
+	
+	toString: function() {
+		var self = this;
+		return this.template.replace(/%\w+/g, function(match) {
+			switch(match) {
+				case '%not':
+					return self.not ? '!' : '';
+				case '%term':
+					return 'obj.' + self.term + (self.value instanceof Date ? '.getTime()' : '');
+				case '%operator':
+					return self.operator;
+				case '%value':
+					return JSON.stringify(self.value instanceof Date ? self.value.getTime() : self.value);
+			}
+		});
+	}
+};
+
+jade.sort = function(term, type, direction) {
+	this.term = term;
+	this.type = type || this.regular;
+	this.direction = direction || 1;
+}
+jade.sort.prototype = {
+	
+	toFunction: function() {
+		return this.type(this.term, this.direction);
+	},
+	regular: function(prop, order) {
+		return function(a, b) {
+			a = a[prop];
+			b = b[prop];
+			if (b == null) return -1;
+			if (a == null) return 1;
+			return order * (a > b ? 1 : (a < b ? -1 : 0));
+		};
+	},
+	numeric: function(prop, order) {
+		return function(a, b) {
+			a = parseFloat(a[prop]);
+			b = parseFloat(b[prop]);
+			if (b == null || isNaN(b)) return -1;
+			if (a == null || isNaN(a)) return 1;
+			return order * (a - b);
+		};
+	},
+	date: function(prop, order) {
+		return function(a, b) {
+			a = a[prop];
+			b = b[prop];
+			if (b == null) return -1;
+			if (a == null) return 1;
+			return order * (a.getTime() - b.getTime());
+		};
+	},
+	custom: function(prop, func) {
+		return function(a, b) {
+			return func(a[prop], b[prop]);
+		};
+	}
+};
+
+var isField = /^[$_a-z][$\w]*$/i;
+
+q = jade.query = function(field) {
+	if ( !(this instanceof jade.query) ) {
+		return new jade.query(field);
+	}
+	
+	if (field) {
+		this._expression = new jade.expression(field);
+	}
+	this._eval = '';
+	this._lookups = {};
+	this._searches = {};
+	this._sorts = [];
+};
+jade.query.prototype = {
+	_add: function(eval, clean) {
+		this._eval += eval;
+		if (clean) this._expression = null;
+		return this;
+	},
+	_term: function(condition, field) {
+		this._flush();
+		this._eval += ' ' + condition + ' ';
+		if (type(field) == 'string') {
+			this._expression = new jade.expression(field);
+		} else if (field instanceof jade.query) {
+			for (var i in field._lookups) {
+				if (field._lookups.hasOwnProperty(i)) this._lookups[i] = field._lookups[i];
+			}
+			this._eval += '(' + field + ')';
+		} else if (field) {
+			this._eval += '(' + field + ')';
+		}
+		return this;
+	},
+	_oper: function(operator, value) {
+		if (this._expression) {
+			this._expression.operator = operator;
+			this._expression.value = value;
+		}
+		return this;
+	},
+	_store: function(value, isSearch) {
+		var postFix = Math.round(Math.random()*1000000);
+		if (isSearch) {
+			this._searches[postFix] = value;
+			return 'this._searches[' + postFix + ']';
+		} else {
+			this._lookups[postFix] = value;
+			return 'this._lookups[' + postFix + ']';
+		}
+	},
+	_sort: function(param, value) {
+		if (this._sorts.length == 0) return;
+		var sort = this._sorts[this._sorts.length - 1];
+		if (type(param) == 'number') sort.direction = param;
+		else {
+			sort.type = sort[param];
+			if (value !== undefined) sort.direction = value;
+		}
+		return this;
+	},
+	_flush: function() {
+		if (this._expression) this._eval += this._expression;
+		this._expression = null;
+	},
+	toString: function() {
+		this._flush();
+		return this._eval;
+	},
+	and: function(field) {
+		return this._term('&&', field);
+	},
+	or: function(field) {
+		return this._term('||', field);
+	},
+	not: function(field) {
+		if (this._expression) this._expression.not = !this._expression.not;
+		return this;
+	},
+	is: function(value) {
+		return this._oper('==', value);
+	},
+	within: function(value) { // when an array of values is passed
+		var lookup = {};
+		for (var i in value) lookup[value[i]] = true;
+		
+		if (this._expression) this._expression.template = '%not(!!%operator[%term])';
+		return this._oper(this._store(lookup));
+	},
+	has: function(value) {
+		if (this._expression) this._expression.template = '%not(%term != null && %term.indexOf(%value) != -1)';
+		return this._oper(null, value);
+	},
+	startsWith: function(value) {
+		if (this._expression) this._expression.template = '%not(%term != null && %term.substr(0, %operator) == %value)';
+		return this._oper(value.length, value);
+	},
+	endsWith: function(value) {
+		if (this._expression) this._expression.template = '%not(%term != null && %term.substr(%term.length - %operator) == %value)';
+		return this._oper(value.length, value);
+	},
+	gt: function(value) {
+		return this._oper('>', value);
+	},
+	gte: function(value) {
+		return this._oper('>=', value);
+	},
+	lt: function(value) {
+		return this._oper('<', value);
+	},
+	lte: function(value) {
+		return this._oper('<=', value);
+	},
+	regex: function(value) {
+		if (this._expression) this._expression.template = '%not(%term != null && %operator.test(%term))';
+		return this._oper(this._store(value));
+	},
+	same: function(value) {
+		if (this._expression) this._expression.template = '%not(JSON.stringify(%term) %operator %value)';
+		value = JSON.stringify(value);
+		return this._oper('==', value);
+	},
+	filter: function(value) {
+		if (type(value) != 'function') throw new Error('JaDE query.filter() parameter must be a function');
+		if (this._expression) this._expression.template = '%not(%operator(%term))';
+		return this._oper(this._store(value));
+	},
+	type: function(value) {
+		if (type(value) == 'function') {
+			if (!this._expression) { // check the type of the main object
+				this._expression = new jade.expression();
+				this._expression.template = '%not(obj instanceof %operator)';
+			} else {
+				this._expression.template = '%not(%term instanceof %operator)';
+			}
+			return this._oper(this._store(value));
+		} else {
+			if (this._expression) this._expression.template = '%not(type(%term) %operator %value)';
+			return this._oper('==', value);
+		}
+	},
+	search: function(value) {
+		if (!this._expression) this._expression = new jade.expression();
+		this._expression.template = '%not(%operator[getId(obj)])';
+		return this._oper(this._store(value, true));
+	},
+	sort: function(field) {
+		this._sorts.push(new jade.sort(field));
+		return this;
+	},
+	asc: function() {
+		return this._sort(1);
+	},
+	desc: function() {
+		return this._sort(-1);
+	},
+	regular: function() {
+		return this._sort('regular');
+	},
+	numeric: function() {
+		return this._sort('numeric');
+	},
+	date: function() {
+		return this._sort('date');
+	},
+	custom: function(value) {
+		return this._sort('custom', value);
+	},
+	limit: function(value) {
+		this._limit = value;
+		return this;
+	},
+	offset: function(value) {
+		this._offset = value;
+		return this;
+	}
+};
+
+//var q = query('firstName').is('bob');
+//q.and(query('price').gt(100).or('price').lt(50));
+//q.not('lastName').startsWith('P');
+//this.db.get(q);
 
 
 function propUpdate(updates) {
