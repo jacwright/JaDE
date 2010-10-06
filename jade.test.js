@@ -106,7 +106,7 @@ TestCase('JaDETest', {
 		this.db.add([ bob1, fred, bob2 ]);
 		
 		var results = this.db.get({
-			firstName: {starts: 'Bob'}
+			firstName: {startsWith: 'Bob'}
 		});
 		
 		assertEquals('jade.get starts filter incorrect', [bob1, bob2], results);
@@ -114,7 +114,7 @@ TestCase('JaDETest', {
 		assertEquals('jade.get starts filter incorrect', [bob1, bob2], this.db.get(q('firstName').startsWith('Bob')));
 		
 		results = this.db.get({
-			lastName: {ends: 'son'}
+			lastName: {endsWith: 'son'}
 		});
 		
 		assertEquals('jade.get ends filter incorrect', [fred, bob2], results);

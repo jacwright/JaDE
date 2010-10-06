@@ -553,6 +553,9 @@ jade.query.prototype = {
 		if (this._expression) this._expression.not = !this._expression.not;
 		return this;
 	},
+	equals: function(value) {
+		return this._oper('==', value);
+	},
 	is: function(value) {
 		return this._oper('==', value);
 	},
@@ -703,13 +706,13 @@ var providedFilters = {
 			});
 		};
 	},
-	starts: function(prop, value) {
+	startsWith: function(prop, value) {
 		var length = value.length;
 		return function(record) {
 			return record[prop] && record[prop].substr(0, length) == value;
 		};
 	},
-	ends: function(prop, value) {
+	endsWith: function(prop, value) {
 		var length = value.length;
 		return function(record) {
 			var v = record[prop];
