@@ -10,6 +10,7 @@ jade = function(options) {
 	this._lookup = {};
 	this._idField = options.id || defaultId;
 	if (options.bucket) this._bucket = options.bucket;
+	if (options.index) this.index(options.index);
 
 	// this data should be loaded from and stored into localStorage by this key
 	if (options.bucket && typeof localStorage != 'undefined') {
