@@ -2,13 +2,17 @@ var jade, q;
 
 (function() {
 
-jade = function(storageBucket) {
+var defaultId = '_id';
+
+jade = function(options) {
+	options = options || {};
 	this._store = [];
 	this._lookup = {};
-	this._bucket = storageBucket;
+	this._idField = options.id || defaultId;
+	if (options.bucket) this._bucket = options.bucket;
 
 	// this data should be loaded from and stored into localStorage by this key
-	if (storageBucket && typeof localStorage != 'undefined') {
+	if (options.bucket && typeof localStorage != 'undefined') {
 		this.restore();
 		var self = this;
 		var flush = function() {
@@ -86,7 +90,19 @@ jade.prototype = {
 	},
 	
 	id: function(field) {
-		this._idField = field || null;
+		if (!arguments.length) return this._idField;
+		
+		field = field || defaultId;
+		
+		this._idField = field;
+		var lookup = {};
+		
+		this._store.forEach(function(obj) {
+			delete obj[defaultId];
+			lookup[obj[field]] = obj;
+		});
+		
+		this.reindex();
 	},
 
 	/**
@@ -94,6 +110,7 @@ jade.prototype = {
 	 * @param fields An array of fields to be indexed.
 	 */
 	index: function(fields) {
+		if (!arguments.length) return this._indexFields;
 		if (!fields) {
 			this._indexFields = this._index = null;
 			return;
@@ -107,14 +124,24 @@ jade.prototype = {
 			self._indexObj(obj);
 		});
 	},
+	
+	reindex: function() {
+		if (!this._indexFields) return;
+		this._index = {};
+		this._store.forEach(function(obj) {
+			self._indexObj(obj);
+		});
+	},
 
 	flush: function(clean) {
 		if (this._bucket && typeof localStorage != 'undefined') {
 			var data = this._store;
 			if (clean) {
-				data.forEach(function(obj) {
-					delete obj._id;
-				});
+				if (!this.id()) {
+					data.forEach(function(obj) {
+						delete obj[defaultId];
+					});
+				}
 				this._store = null;
 			} 
 			localStorage.setItem(this._bucket, JSON.stringify(data));
@@ -129,11 +156,13 @@ jade.prototype = {
 				
 				if (this._index) this._index = {};
 				
-				// don't let stored _id fields conflict with the live counter
-				this._store.forEach(function(obj) {
-					obj._id = ++uuid;
-					this._indexObj(obj);
-				});
+				// don't let stored defaultId fields conflict with the live counter
+				if (this._idField == defaultId) {
+					this._store.forEach(function(obj) {
+						obj[defaultId] = ++uuid;
+					});
+				}
+				this.reindex();
 			}
 		}
 	},
@@ -146,7 +175,7 @@ jade.prototype = {
 
 	
 	_getId: function(obj) {
-		return this._idField ? obj[this._idField] : getId(obj);
+		return this._idField != defaultId ? obj[this._idField] : getId(obj);
 	},
 
 	_indexObj: function(obj) {
@@ -849,7 +878,7 @@ var providedSorts = {
 var uuid = 0;
 
 function getId(obj) {
-	return obj.hasOwnProperty('_id') ? obj._id : (obj._id = ++uuid);
+	return obj.hasOwnProperty(defaultId) ? obj[defaultId] : (obj[defaultId] = ++uuid);
 }
 
 var stopWords = [ "a", "an", "and", "are", "as", "at", "be", "but", "by",
