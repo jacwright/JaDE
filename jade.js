@@ -1,10 +1,10 @@
-var jade, q;
+var Jade, q;
 
 (function() {
 
 var defaultId = '_id';
 
-jade = function(options) {
+Jade = function(options) {
 	options = options || {};
 	this._store = [];
 	this._lookup = {};
@@ -25,7 +25,7 @@ jade = function(options) {
 	}
 }
 
-jade.prototype = {
+Jade.prototype = {
 
 	/**
 	 * Returns an array of records which match the provided filters, or all the records if no filters are specified. The
@@ -35,7 +35,7 @@ jade.prototype = {
 	 * @param [records] An optional array of object to search. If not provided will use all records in the database.
 	 */
 	get: function(filters, records) {
-		return filters instanceof jade.query ? this._query(records || this._store, filters) : this._filter(records || this._store, filters);
+		return filters instanceof Jade.query ? this._query(records || this._store, filters) : this._filter(records || this._store, filters);
 	},
 
 	first: function(filters, records) {
@@ -71,22 +71,27 @@ jade.prototype = {
 	},
 
 	remove: function(filters) {
-		var removed = {}, lookup = this._lookup, onRemove = this.onRemove;
+		var removed = {}, lookup = this._lookup, onRemove = this.onRemove, db = this, objIds = [];
+		console.log("length pre", this._store.length);
 		var records = this.get(filters);
+		console.log("length first", this._store.length);
 
 		records.forEach(function(obj) {
 			if (onRemove) onRemove(obj);
-			var id = this._getId(obj);
+			var id = db._getId(obj);
+			objIds.push(id);
 			delete lookup[id];
 			removed[id] = true;
-			this._unindexObj(obj);
 		});
+		
+		db._unindexObj(objIds);
 
+		console.log("length middle", this._store.length);
 		this._store = this._store.filter(function(obj) {
-			return !removed[this._getId(obj)];
+			return !removed[db._getId(obj)];
 		});
+		console.log("length after", this._store.length);
 
-		this._store = records;
 		return records.length;
 	},
 	
@@ -192,15 +197,17 @@ jade.prototype = {
 		return terms;
 	},
 
-	_unindexObj: function(obj) {
+	_unindexObj: function(objIds) {
 		if (!this._index) return;
-		var id = this._getId(obj), index = this._index;
+		var index = this._index;
 		for (var char in index) {
 			if (!index.hasOwnProperty(char)) continue;
 			var letter = index[char];
 			for (var i in letter) {
 				if (!letter.hasOwnProperty(i)) continue;
-				delete letter[i][id];
+				objIds.forEach(function(id) {
+					if (letter[i].hasOwnProperty(id)) delete letter[i][id];
+				});
 			}
 		}
 	},
@@ -216,8 +223,12 @@ jade.prototype = {
 		var terms = [], getTerms = this._getTerms;
 		
 		this._indexFields.forEach(function(field) {
-			if (!obj.hasOwnProperty(field)) return;
-			var value = obj[field];
+			var value;
+			try {
+				value = eval('obj.' + field);
+			} catch (e) {
+				return;
+			}
 			if (value == null) return; // value is null, don't index
 			if (value instanceof Array && value.length && type(value[0]) == 'string') {
 				value.forEach(function(value) {
@@ -239,7 +250,7 @@ jade.prototype = {
 		var tokens = value.split(/\s+/);
 		for (var i = 0, l = tokens.length; i < l; i++) {
 			var token = tokens[i];
-			if (!sw[token]) terms.push(token); // with custom punctuation (e.g. @twitter, #search, (parenthesis))
+			/*if (!sw[token])*/ terms.push(token); // with custom punctuation (e.g. @twitter, #search, (parenthesis))
 			if (!isQuery) {
 				var word = token.replace(/^\W+|\W+$/g, ''); // without custom punctuation
 				if (word != token) terms.push(word);
@@ -250,18 +261,26 @@ jade.prototype = {
 	
 	_search: function(value) {
 		var terms = this._getTerms(value, true), index = this._index;
-		var hits = {};
+		if (!index) throw new Error('No index was defined for this database, therefore no searches can be made.');
+		var hits;
 		
 		terms.forEach(function(term) {
-			var regex = new RegExp(RegExp.escape(term)), char = term.charAt(0), terms = index[char];
+			var regex = new RegExp(RegExp.escape(term)), char = term.charAt(0), terms = index[char], termHits = {};
 			for (var i in terms) {
 				if (!terms.hasOwnProperty(i)) continue;
 				if (regex.test(i)) {
 					var ids = terms[i];
 					for (var id in ids) {
-						if (ids.hasOwnProperty(id)) hits[id] = true;
+						if (ids.hasOwnProperty(id)) termHits[id] = true;
 					}
 				}
+			}
+			if (hits) {
+				for (var j in hits) {
+					if (!termHits[j]) delete hits[j];
+				}
+			} else {
+				hits = termHits;
 			}
 		});
 		
@@ -277,15 +296,17 @@ jade.prototype = {
 			while (i < len && direction == 0) {
 				direction = sorts[i++](a, b);
 			}
+			return direction;
 		}
 	},
 	
 	_query: function(records, query) {
 		if (!query) return records;
 		var filter, searches = query._searches, sorts = query._sorts, queryStr = query.toString();
+		
 		if (queryStr) {
 			try {
-				eval('filter = function(obj) { try { return ' + queryStr + '; } catch (e) { console.log(e); return false; } }');
+				eval('filter = function(obj) { try { return ' + queryStr + '; } catch (e) { return false; } }');
 			} catch (e) {
 				throw new Error('A bug was found in JaDE.query\'s eval() code: "(function(obj) { return ' + query + '; })"');
 			}
@@ -297,6 +318,8 @@ jade.prototype = {
 			}
 			
 			records = records.filter(filter, query);
+		} else {
+			records = records.slice();
 		}
 		
 		if (sorts.length) {
@@ -306,7 +329,7 @@ jade.prototype = {
 			records = records.slice(query._offset);
 		}
 		if (query._limit) {
-			records.lenght = query._limit;
+			records.length = query._limit;
 		}
 		return records;
 	},
@@ -319,7 +342,8 @@ jade.prototype = {
 	 */
 	_filter: function(records, filters) {
 		if (!filters) return records;
-
+		records = records.slice();
+		
 		if (type(filters) == 'array') {
 			// handle an array of ids
 			if (type(filters[0]) == 'number') {
@@ -432,14 +456,14 @@ jade.prototype = {
 };
 
 
-jade.expression = function(term, operator, value, not) {
+Jade.expression = function(term, operator, value, not) {
 	this.term = term;
 	this.operator = operator;
 	this.value = value;
 	this.not = not;
 	this.template = '%not(%term %operator %value)';
 };
-jade.expression.prototype = {
+Jade.expression.prototype = {
 	
 	toString: function() {
 		var self = this;
@@ -458,12 +482,12 @@ jade.expression.prototype = {
 	}
 };
 
-jade.sort = function(term, type, direction) {
+Jade.sort = function(term, type, direction) {
 	this.term = term;
 	this.type = type || this.regular;
 	this.direction = direction || 1;
 }
-jade.sort.prototype = {
+Jade.sort.prototype = {
 	
 	toFunction: function() {
 		return this.type(this.term, this.direction);
@@ -504,20 +528,20 @@ jade.sort.prototype = {
 
 var isField = /^[$_a-z][$\w]*$/i;
 
-q = jade.query = function(field) {
-	if ( !(this instanceof jade.query) ) {
-		return new jade.query(field);
+q = Jade.query = function(field) {
+	if ( !(this instanceof Jade.query) ) {
+		return new Jade.query(field);
 	}
 	
 	if (field) {
-		this._expression = new jade.expression(field);
+		this._expression = new Jade.expression(field);
 	}
 	this._eval = '';
 	this._lookups = {};
 	this._searches = {};
 	this._sorts = [];
 };
-jade.query.prototype = {
+Jade.query.prototype = {
 	_add: function(eval, clean) {
 		this._eval += eval;
 		if (clean) this._expression = null;
@@ -527,8 +551,8 @@ jade.query.prototype = {
 		this._flush();
 		this._eval += ' ' + condition + ' ';
 		if (type(field) == 'string') {
-			this._expression = new jade.expression(field);
-		} else if (field instanceof jade.query) {
+			this._expression = new Jade.expression(field);
+		} else if (field instanceof Jade.query) {
 			for (var i in field._lookups) {
 				if (field._lookups.hasOwnProperty(i)) this._lookups[i] = field._lookups[i];
 			}
@@ -637,7 +661,7 @@ jade.query.prototype = {
 	type: function(value) {
 		if (type(value) == 'function') {
 			if (!this._expression) { // check the type of the main object
-				this._expression = new jade.expression();
+				this._expression = new Jade.expression();
 				this._expression.template = '%not(obj instanceof %operator)';
 			} else {
 				this._expression.template = '%not(%term instanceof %operator)';
@@ -649,12 +673,16 @@ jade.query.prototype = {
 		}
 	},
 	search: function(value) {
-		if (!this._expression) this._expression = new jade.expression();
+		if (!value) {
+			this._eval = this._eval.substring(0, this._eval.length - 4);
+			return this;
+		}
+		if (!this._expression) this._expression = new Jade.expression();
 		this._expression.template = '%not(%operator[getId(obj)])';
 		return this._oper(this._store(value, true));
 	},
 	sort: function(field) {
-		this._sorts.push(new jade.sort(field));
+		this._sorts.push(new Jade.sort(field));
 		return this;
 	},
 	asc: function() {
@@ -684,12 +712,6 @@ jade.query.prototype = {
 		return this;
 	}
 };
-
-//var q = query('firstName').is('bob');
-//q.and(query('price').gt(100).or('price').lt(50));
-//q.not('lastName').startsWith('P');
-//this.db.get(q);
-
 
 function propUpdate(updates) {
 	return function(obj) {
@@ -882,16 +904,16 @@ function getId(obj) {
 	return obj.hasOwnProperty(defaultId) ? obj[defaultId] : (obj[defaultId] = ++uuid);
 }
 
-var stopWords = [ "a", "an", "and", "are", "as", "at", "be", "but", "by",
-	"for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or",
-	"s", "such", "t", "that", "the", "their", "they", "then", "there",
-	"these", "this", "to", "was", "will", "with" ];
-
-// stop words lookup
-var sw = {};
-for (var i = 0, l = stopWords.length; i < l; i++) {
-	sw[stopWords[i]] = true;
-}
+//var stopWords = [ "a", "an", "and", "are", "as", "at", "be", "but", "by",
+//	"for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or",
+//	"s", "such", "t", "that", "the", "their", "they", "then", "there",
+//	"these", "this", "to", "was", "will", "with" ];
+//
+//// stop words lookup
+//var sw = {};
+//for (var i = 0, l = stopWords.length; i < l; i++) {
+//	sw[stopWords[i]] = true;
+//}
 
 RegExp.escape = function(text) {
 	return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
