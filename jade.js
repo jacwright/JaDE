@@ -520,9 +520,15 @@ Jade.sort.prototype = {
 		};
 	},
 	custom: function(prop, func) {
-		return function(a, b) {
-			return func(a[prop], b[prop]);
-		};
+		if (prop) {
+			return function(a, b) {
+				return func(a[prop], b[prop]);
+			};
+		} else {
+			return function(a, b) {
+				return func(a, b);
+			};
+		}
 	}
 };
 
@@ -656,6 +662,10 @@ Jade.query.prototype = {
 	filter: function(value) {
 		if (type(value) != 'function') throw new Error('JaDE query.filter() parameter must be a function');
 		if (this._expression) this._expression.template = '%not(%operator(%term))';
+		else {
+			this._expression = new Jade.expression();
+			this._expression.template = '%not(%operator(obj))';
+		}
 		return this._oper(this._store(value));
 	},
 	type: function(value) {
