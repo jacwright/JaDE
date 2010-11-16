@@ -2,7 +2,7 @@
 TestCase('JaDETest', {
 	
 	setUp: function() {
-		this.db = new jade();
+		this.db = new Jade();
 	},
 	
 	tearDown: function() {
@@ -10,32 +10,32 @@ TestCase('JaDETest', {
 	},
 	
 	testAdd: function() {
-		this.db.add({name: "jade"});
-		assertEquals('jade.add not adding single items', 1, this.db._store.length);
+		this.db.add({name: "Jade"});
+		assertEquals('Jade.add not adding single items', 1, this.db._store.length);
 		
 		this.db._store.length = 0;
-		this.db.add([ {name: "jade"}, {name: "jade"} ]);
-		assertEquals('jade.add not adding multiple items', 2, this.db._store.length);
+		this.db.add([ {name: "Jade"}, {name: "Jade"} ]);
+		assertEquals('Jade.add not adding multiple items', 2, this.db._store.length);
 	},
 	
 	testQuery: function() {
-		var query = jade.query('name').is('John');
-		assertEquals('jade.query "is" incorrect', '(obj.name == "John")', query.toString());
+		var query = Jade.query('name').is('John');
+		assertEquals('Jade.query "is" incorrect', '(obj.name == "John")', query.toString());
 		
-		query = jade.query('firstName').is('John').and('lastName').is('Anderson');
-		assertEquals('jade.query "and" incorrect', '(obj.firstName == "John") && (obj.lastName == "Anderson")', query.toString());
+		query = Jade.query('firstName').is('John').and('lastName').is('Anderson');
+		assertEquals('Jade.query "and" incorrect', '(obj.firstName == "John") && (obj.lastName == "Anderson")', query.toString());
 		
-		query = jade.query('firstName').is('John').or('lastName').is('Anderson');
-		assertEquals('jade.query "or" incorrect', '(obj.firstName == "John") || (obj.lastName == "Anderson")', query.toString());
+		query = Jade.query('firstName').is('John').or('lastName').is('Anderson');
+		assertEquals('Jade.query "or" incorrect', '(obj.firstName == "John") || (obj.lastName == "Anderson")', query.toString());
 		
-		query = jade.query('firstName').is('John').and(jade.query('lastName').is(null).or('lastName').is('Anderson'));
-		assertEquals('jade.query "subquery" incorrect', '(obj.firstName == "John") && ((obj.lastName == null) || (obj.lastName == "Anderson"))', query.toString());
+		query = Jade.query('firstName').is('John').and(Jade.query('lastName').is(null).or('lastName').is('Anderson'));
+		assertEquals('Jade.query "subquery" incorrect', '(obj.firstName == "John") && ((obj.lastName == null) || (obj.lastName == "Anderson"))', query.toString());
 		
-		query = jade.query('firstName').gte('John');
-		assertEquals('jade.query "gte" incorrect', '(obj.firstName >= "John")', query.toString());
+		query = Jade.query('firstName').gte('John');
+		assertEquals('Jade.query "gte" incorrect', '(obj.firstName >= "John")', query.toString());
 		
-		query = jade.query('tags.length').gt(0);
-		assertEquals('jade.query deep terms incorrect', '(obj.tags.length > 0)', query.toString());
+		query = Jade.query('tags.length').gt(0);
+		assertEquals('Jade.query deep terms incorrect', '(obj.tags.length > 0)', query.toString());
 	},
 	
 	testGet: function() {
@@ -46,16 +46,16 @@ TestCase('JaDETest', {
 		this.db.add([ bob1, fred, bob2 ]);
 		
 		var result = this.db.get({firstName: 'Bob'});
-		assertEquals('jade.get did not return correct basic matches', [bob1, bob2], result);
+		assertEquals('Jade.get did not return correct basic matches', [bob1, bob2], result);
 		
 		result = this.db.get({firstName: 'Fred', lastName: 'Wilson'});
-		assertEquals('jade.get did not return correct number of basic matches', [fred], result);
+		assertEquals('Jade.get did not return correct number of basic matches', [fred], result);
 		
 		result = this.db.get(q('firstName').is('Bob'));
-		assertEquals('jade.get query did not return correct basic matches', [bob1, bob2], result);
+		assertEquals('Jade.get query did not return correct basic matches', [bob1, bob2], result);
 		
 		result = this.db.get(q('firstName').is('Fred').and('lastName').is('Wilson'));
-		assertEquals('jade.get query did not return correct basic matches', [fred], result);
+		assertEquals('Jade.get query did not return correct basic matches', [fred], result);
 	},
 	
 	testFirst: function() {
@@ -65,7 +65,7 @@ TestCase('JaDETest', {
 		
 		this.db.add([ bob1, fred, bob2 ]);
 		
-		assertEquals('jade.first did not return the correct result', bob1, this.db.first());
+		assertEquals('Jade.first did not return the correct result', bob1, this.db.first());
 	},
 	
 	testHas: function() {
@@ -79,9 +79,9 @@ TestCase('JaDETest', {
 			tags: {has: 'one'}
 		});
 		
-		assertEquals('jade.get has filter incorrect', [one, three], results);
+		assertEquals('Jade.get has filter incorrect', [one, three], results);
 		
-		assertEquals('jade.get has filter incorrect', [one, three], this.db.get(q('tags').has('one')));
+		assertEquals('Jade.get has filter incorrect', [one, three], this.db.get(q('tags').has('one')));
 	},
 	
 	testHasAll: function() {
@@ -95,7 +95,7 @@ TestCase('JaDETest', {
 			tags: {hasAll: ['one', 'two']}
 		});
 		
-		assertEquals('jade.get hasAll filter incorrect', [one], results);
+		assertEquals('Jade.get hasAll filter incorrect', [one], results);
 	},
 	
 	testStartsAndEnds: function() {
@@ -109,17 +109,17 @@ TestCase('JaDETest', {
 			firstName: {startsWith: 'Bob'}
 		});
 		
-		assertEquals('jade.get starts filter incorrect', [bob1, bob2], results);
+		assertEquals('Jade.get starts filter incorrect', [bob1, bob2], results);
 		
-		assertEquals('jade.get starts filter incorrect', [bob1, bob2], this.db.get(q('firstName').startsWith('Bob')));
+		assertEquals('Jade.get starts filter incorrect', [bob1, bob2], this.db.get(q('firstName').startsWith('Bob')));
 		
 		results = this.db.get({
 			lastName: {endsWith: 'son'}
 		});
 		
-		assertEquals('jade.get ends filter incorrect', [fred, bob2], results);
+		assertEquals('Jade.get ends filter incorrect', [fred, bob2], results);
 		
-		assertEquals('jade.get ends filter incorrect', [fred, bob2], this.db.get(q('lastName').endsWith('son')));
+		assertEquals('Jade.get ends filter incorrect', [fred, bob2], this.db.get(q('lastName').endsWith('son')));
 	},
 	
 	testGreaterThan: function() {
@@ -130,14 +130,14 @@ TestCase('JaDETest', {
 		this.db.add([ bob1, fred, bob2 ]);
 		
 		var results = this.db.get({ age: {gt: 20} });
-		assertEquals('jade.get gt filter incorrect', [fred, bob2], results);
+		assertEquals('Jade.get gt filter incorrect', [fred, bob2], results);
 		
-		assertEquals('jade.get gt filter incorrect', [fred, bob2], this.db.get(q('age').gt(20)));
+		assertEquals('Jade.get gt filter incorrect', [fred, bob2], this.db.get(q('age').gt(20)));
 		
 		results = this.db.get({ age: {gte: 28} });
-		assertEquals('jade.get gte filter incorrect', [fred, bob2], results);
+		assertEquals('Jade.get gte filter incorrect', [fred, bob2], results);
 		
-		assertEquals('jade.get gte filter incorrect', [fred, bob2], this.db.get(q('age').gte(28)));
+		assertEquals('Jade.get gte filter incorrect', [fred, bob2], this.db.get(q('age').gte(28)));
 	},
 	
 	testLessThan: function() {
@@ -148,14 +148,14 @@ TestCase('JaDETest', {
 		this.db.add([ bob1, fred, bob2 ]);
 		
 		var results = this.db.get({ age: {lt: 28} });
-		assertEquals('jade.get lt filter incorrect', [bob1], results);
+		assertEquals('Jade.get lt filter incorrect', [bob1], results);
 		
-		assertEquals('jade.get lt filter incorrect', [bob1], this.db.get(q('age').lt(28)));
+		assertEquals('Jade.get lt filter incorrect', [bob1], this.db.get(q('age').lt(28)));
 		
 		results = this.db.get({ age: {lte: 28} });
-		assertEquals('jade.get lte filter incorrect', [bob1, bob2], results);
+		assertEquals('Jade.get lte filter incorrect', [bob1, bob2], results);
 		
-		assertEquals('jade.get lte filter incorrect', [bob1, bob2], this.db.get(q('age').lte(28)));
+		assertEquals('Jade.get lte filter incorrect', [bob1, bob2], this.db.get(q('age').lte(28)));
 	},
 	
 	testRegex: function() {
@@ -166,12 +166,12 @@ TestCase('JaDETest', {
 		this.db.add([ bob1, fred, bob2 ]);
 		
 		var results = this.db.get({ firstName: /^B/ });
-		assertEquals('jade.get regex filter incorrect', [bob1, bob2], results);
-		assertEquals('jade.get regex filter incorrect', [bob1, bob2], this.db.get(q('firstName').regex(/^B/)));
+		assertEquals('Jade.get regex filter incorrect', [bob1, bob2], results);
+		assertEquals('Jade.get regex filter incorrect', [bob1, bob2], this.db.get(q('firstName').regex(/^B/)));
 		
 		results = this.db.get({ lastName: {regex: /^\w+$/} });
-		assertEquals('jade.get regex filter incorrect', [bob1, fred, bob2], results);
-		assertEquals('jade.get regex filter incorrect', [bob1, fred, bob2], this.db.get(q('lastName').regex(/^\w+$/)));
+		assertEquals('Jade.get regex filter incorrect', [bob1, fred, bob2], results);
+		assertEquals('Jade.get regex filter incorrect', [bob1, fred, bob2], this.db.get(q('lastName').regex(/^\w+$/)));
 	},
 	
 	testSame: function() {
@@ -182,8 +182,8 @@ TestCase('JaDETest', {
 		this.db.add([ bob1, fred, bob2 ]);
 		
 		var results = this.db.get({ pet: { same: {type: 'dog'} } });
-		assertEquals('jade.get same filter incorrect', [bob1], results);
-		assertEquals('jade.get same filter incorrect', [bob1], this.db.get(q('pet').same({type: 'dog'})));
+		assertEquals('Jade.get same filter incorrect', [bob1], results);
+		assertEquals('Jade.get same filter incorrect', [bob1], this.db.get(q('pet').same({type: 'dog'})));
 	},
 	
 	testLength: function() {
@@ -194,12 +194,12 @@ TestCase('JaDETest', {
 		this.db.add([ bob1, fred, bob2 ]);
 		
 		var results = this.db.get({ pets: { length: 2 } });
-		assertEquals('jade.get length filter incorrect', [bob2], results);
-		assertEquals('jade.get length filter incorrect', [bob2], this.db.get(q('pets.length').is(2)));
+		assertEquals('Jade.get length filter incorrect', [bob2], results);
+		assertEquals('Jade.get length filter incorrect', [bob2], this.db.get(q('pets.length').is(2)));
 		
 		results = this.db.get({ pets: { length: {gte: 2} } });
-		assertEquals('jade.get length with object filter incorrect', [fred, bob2], results);
-		assertEquals('jade.get length with object filter incorrect', [fred, bob2], this.db.get(q('pets.length').gte(2)));
+		assertEquals('Jade.get length with object filter incorrect', [fred, bob2], results);
+		assertEquals('Jade.get length with object filter incorrect', [fred, bob2], this.db.get(q('pets.length').gte(2)));
 	},
 	
 	testSearch: function() {
@@ -211,16 +211,16 @@ TestCase('JaDETest', {
 		this.db.add([ one, two, three ]);
 		
 		var results = this.db.get('bob');
-		assertEquals('jade.get search incorrect', [one, two], results);
-		assertEquals('jade.get search incorrect', [one, two], this.db.get(q().search('bob')));
+		assertEquals('Jade.get search incorrect', [one, two], results);
+		assertEquals('Jade.get search incorrect', [one, two], this.db.get(q().search('bob')));
 		
 		var results = this.db.get('#bob');
-		assertEquals('jade.get search incorrect', [two], results);
-		assertEquals('jade.get search incorrect', [two], this.db.get(q().search('#bob')));
+		assertEquals('Jade.get search incorrect', [two], results);
+		assertEquals('Jade.get search incorrect', [two], this.db.get(q().search('#bob')));
 		
 		results = this.db.get({ _search: 'teeth' });
-		assertEquals('jade.get _search incorrect', [three], results);
-		assertEquals('jade.get _search incorrect', [three], this.db.get(q().search('teeth')));
+		assertEquals('Jade.get _search incorrect', [three], results);
+		assertEquals('Jade.get _search incorrect', [three], this.db.get(q().search('teeth')));
 	},
 	
 	testSort: function() {
@@ -231,16 +231,16 @@ TestCase('JaDETest', {
 		this.db.add([ bob1, fred, bob2 ]);
 		
 		var results = this.db.get({ _sort: 'lastName' });
-		assertEquals('jade.get default sort incorrect', [bob2, bob1, fred], results);
-		assertEquals('jade.get default sort incorrect', [bob2, bob1, fred], this.db.get(q().sort('lastName')));
+		assertEquals('Jade.get default sort incorrect', [bob2, bob1, fred], results);
+		assertEquals('Jade.get default sort incorrect', [bob2, bob1, fred], this.db.get(q().sort('lastName')));
 		
 		results = this.db.get({ _sort: 'lastName desc' });
-		assertEquals('jade.get default sort incorrect', [fred, bob1, bob2], results);
-		assertEquals('jade.get default sort incorrect', [fred, bob1, bob2], this.db.get(q().sort('lastName').desc()));
+		assertEquals('Jade.get default sort incorrect', [fred, bob1, bob2], results);
+		assertEquals('Jade.get default sort incorrect', [fred, bob1, bob2], this.db.get(q().sort('lastName').desc()));
 		
 		results = this.db.get({ _sort: { firstName: 'regular', age: 'numeric desc' } });
-		assertEquals('jade.get sorts incorrect', [bob2, bob1, fred], results);
-		assertEquals('jade.get sorts incorrect', [bob2, bob1, fred], this.db.get(q().sort('firstName').sort('age').numeric().desc()));
+		assertEquals('Jade.get sorts incorrect', [bob2, bob1, fred], results);
+		assertEquals('Jade.get sorts incorrect', [bob2, bob1, fred], this.db.get(q().sort('firstName').sort('age').numeric().desc()));
 	},
 	
 	testLimit: function() {
@@ -251,8 +251,8 @@ TestCase('JaDETest', {
 			_sort: 'int desc',
 			_limit: 3
 		});
-		assertEquals('jade.get limit incorrect', [five, four, three], results);
-		assertEquals('jade.get limit incorrect', [five, four, three], this.db.get(q().sort('int').desc().limit(3)));
+		assertEquals('Jade.get limit incorrect', [five, four, three], results);
+		assertEquals('Jade.get limit incorrect', [five, four, three], this.db.get(q().sort('int').desc().limit(3)));
 	}
 	
 });
